@@ -1,0 +1,101 @@
+# =========================================================================
+# CORTEX APPSEC SYNC CONFIGURATION (v1.0)
+# This configuration file utilizes a deterministic, tiered configuration model.
+# All scan configurations are authored in Pythonic snake_case, which the
+# core engine automatically translates to camelCase/ACRONYM on API submission.
+# =========================================================================
+
+global_config:
+  # Default primary branch targeted for scanning
+  primary_branch: "main"
+
+  # Default list of additional tracked branches across the organization
+  scanned_branches:
+    - "develop"
+    - "staging"
+
+  # Baseline Application Security Scan Configurations
+  # Authored in snake_case; translated to API requirements automatically.
+  scan_config:
+    excluded_paths:
+      - "dist/"
+      - "tests/"
+      - "node_modules/"
+    pr_scanning:
+      is_enabled: true
+      block_on_error: false
+    tagging_bot:
+      tag_module_blocks: false
+      tag_resource_blocks: false
+    scanners:
+      iac:
+        is_enabled: true
+      sca:
+        is_enabled: true
+      secrets:
+        is_enabled: true
+        scan_options:
+          secret_validation: true
+          git_history: true
+
+repo_overrides:
+  # -----------------------------------------------------------------------
+  # SCENARIO 1: Skip Repository Processing Entirely
+  # The 'ignore' modifier halts all processing. No API interactions occur.
+  # -----------------------------------------------------------------------
+  - org: "phelipe-devops"
+    repo: "vulnerable-legacy-demo"
+    ignore: true
+
+  # -----------------------------------------------------------------------
+  # SCENARIO 2: Exclusive Branch Rules (Bypass Global Scanned Branches)
+  # When 'exclude_global' is true, global scanned branches are ignored.
+  # Tracking is strictly locked to 'production' and 'hotfix-v1.0'.
+  # -----------------------------------------------------------------------
+  - org: "phelipe-devops"
+    repo: "production-gateway-api"
+    exclude_global: true
+    primary_branch: "production"
+    scanned_branches:
+      - "hotfix-v1.0"
+    scan_config:
+      scanners:
+        sca:
+          is_enabled: false # Specifically turn off SCA for this repo
+
+  # -----------------------------------------------------------------------
+  # SCENARIO 3: Strict Scan Config Override (Inherited Branches)
+  # Omit scanned_branches entirely to trigger Safe Branch Inheritance.
+  # Preserves all active scanned branches in Cortex, but modifies scan rules.
+  # -----------------------------------------------------------------------
+  - org: "phelipe-devops"
+    repo: "monolithic-service"
+    scan_config:
+      pr_scanning:
+        block_on_error: true # Elevate pull-request blocking security posture
+
+  # -----------------------------------------------------------------------
+  # SCENARIO 4: Explicit Single-Branch Isolation (Untrack Secondary Branches)
+  # Providing an empty array for 'scanned_branches' forces the untracking
+  # of all secondary branches, leaving ONLY the resolved primary branch.
+  # -----------------------------------------------------------------------
+  - org: "phelipe-devops"
+    repo: "cortex-gitops"
+    primary_branch: "main"
+    scanned_branches: [ ] # Bypasses branch inheritance; removes secondary branches
+    scan_config:
+      scanners:
+        secrets:
+          scan_options:
+            git_history: false
+
+  # -----------------------------------------------------------------------
+  # SCENARIO 5: Wildcard Org / Repository Matching
+  # Targets any microservice repo under phelipe-devops, setting develop-v2
+  # as a scan target alongside global branch configurations.
+  # -----------------------------------------------------------------------
+  - org: "phelipe-devops"
+    repo: "microservice-*"
+    allow_wildcard: true
+    scanned_branches:
+      - "develop-v2"
